@@ -40,7 +40,7 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         # Pin lint version so future releases don't break our pipeline.
         with:
-          version: v1.64.5
+          version: v2.0.0
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
