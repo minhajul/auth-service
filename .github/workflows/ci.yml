@@ -7,7 +7,9 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}
+  # Workflow-level env can't reference another env var (GitHub Actions restriction),
+  # so we hardcode the registry here alongside the repo-derived suffix.
+  IMAGE: ghcr.io/${{ github.repository }}
   FLEET_REPO: minhajul/fleet
   # Single source of truth for the values file path; referenced by yq + git add below.
   VALUES_FILE: env/prod/auth-values.yaml
