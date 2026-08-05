@@ -88,9 +88,15 @@ jobs:
 
       - name: Update Helm Values
         working-directory: ./fleet
-        # yq does a structured YAML edit — safe even if more `tag:` fields appear later.
+        # yq does a structured YAML edit — sets repository and tag cleanly.
         run: |
-          yq -i '.image.tag = strenv(SHA_SHORT)' "$VALUES_FILE"
+          yq -i '.image.repository = "ghcr.io/${{ github.repository }}" | .image.tag = strenv(SHA_SHORT)' "$VALUES_FILE"
+
+      - name: Verify Changes
+        working-directory: ./fleet
+        run: |
+          git status
+          git diff
 
       - name: Open PR against fleet
         # Branch is per-push; ArgoCD won't see the change until the PR is merged into main.
