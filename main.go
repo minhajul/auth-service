@@ -14,7 +14,7 @@ import (
 
 const (
 	serviceName = "auth-service"
-	apiVersion  = "v1.0.1"
+	apiVersion  = "v1.0.2"
 )
 
 type healthResponse struct {
@@ -32,7 +32,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		log.Printf("Failed to encode response: %v", err)
 	}
 }
 
@@ -96,5 +96,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Printf("%s stopped", serviceName)
+	log.Printf("%s Stopped", serviceName)
 }
