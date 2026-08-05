@@ -14,7 +14,7 @@ import (
 
 const (
 	serviceName = "auth-service"
-	apiVersion  = "v1.0.0"
+	apiVersion  = "v1.0.1"
 )
 
 type healthResponse struct {
