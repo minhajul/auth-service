@@ -59,7 +59,7 @@ jobs:
       - name: Run Trivy Vulnerability Scanner
         # Image scan subsumes a filesystem scan — runtime deps + base image CVEs
         # are only visible in the built image, so one pass is enough.
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: 'image'
           image-ref: '${{ env.IMAGE }}:${{ env.SHA_SHORT }}'
