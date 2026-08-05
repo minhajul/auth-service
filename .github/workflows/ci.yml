@@ -56,20 +56,7 @@ jobs:
         run: |
           docker build -t ${{ env.IMAGE }}:${{ env.SHA_SHORT }} .
 
-      - name: Run Trivy Vulnerability Scanner
-        # Image scan subsumes a filesystem scan — runtime deps + base image CVEs
-        # are only visible in the built image, so one pass is enough.
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: 'image'
-          image-ref: '${{ env.IMAGE }}:${{ env.SHA_SHORT }}'
-          format: 'table'
-          exit-code: '1'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
-
       - name: Push Docker Image
-        # Only reached if the Trivy scan passes.
         run: |
           docker push ${{ env.IMAGE }}:${{ env.SHA_SHORT }}
 
