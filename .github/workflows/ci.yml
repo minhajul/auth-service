@@ -1,0 +1,125 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}
+  FLEET_REPO: minhajul/fleet
+  # Single source of truth for the values file path; referenced by yq + git add below.
+  VALUES_FILE: env/prod/auth-values.yaml
+
+jobs:
+  build-and-deliver:
+    name: Build, Test, and Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Required to push to GHCR
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1   # shallow clone — only need the HEAD SHA
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Go Tests
+        run: go test -v ./...
+
+      - name: Run Golang Linter
+        uses: golangci/golangci-lint-action@v6
+        # Pin lint version so future releases don't break our pipeline.
+        with:
+          version: v1.59.1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Image Tag
+        run: echo "SHA_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ env.IMAGE }}:${{ env.SHA_SHORT }} .
+
+      - name: Run Trivy Vulnerability Scanner
+        # Image scan subsumes a filesystem scan — runtime deps + base image CVEs
+        # are only visible in the built image, so one pass is enough.
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'image'
+          image-ref: '${{ env.IMAGE }}:${{ env.SHA_SHORT }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Push Docker Image
+        # Only reached if the Trivy scan passes.
+        run: |
+          docker push ${{ env.IMAGE }}:${{ env.SHA_SHORT }}
+
+  update-fleet:
+    name: Update Fleet Repository
+    needs: build-and-deliver
+    runs-on: ubuntu-latest
+    steps:
+      # NOTE: this job writes to another repo, so the default GITHUB_TOKEN is not enough.
+      # Create a PAT (scope: repo, workflow) on your account and store it as
+      # the secret `FLEET_PAT` in this service repo's settings.
+      - name: Set Image Tag
+        run: echo "SHA_SHORT=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_ENV
+
+      - name: Checkout Fleet Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FLEET_REPO }}
+          token: ${{ secrets.FLEET_PAT }}
+          path: fleet
+          fetch-depth: 1
+
+      - name: Install yq
+        # Binary download is ~3s vs ~15s for apt — skip the cache-update overhead.
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
+            && sudo chmod +x /usr/local/bin/yq
+
+      - name: Update Helm Values
+        working-directory: ./fleet
+        # yq does a structured YAML edit — safe even if more `tag:` fields appear later.
+        run: |
+          yq -i '.image.tag = strenv(SHA_SHORT)' "$VALUES_FILE"
+
+      - name: Open PR against fleet
+        working-directory: ./fleet
+        # Branch is per-push; ArgoCD won't see the change until the PR is merged into main.
+        # `commit-message` runs after the file edit so the PR body and commit stay in sync.
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.FLEET_PAT }}
+          push-to-fork: false
+          branch: ci/auth-prod-${{ env.SHA_SHORT }}
+          base: main
+          title: "ci(auth-service): update image tag to ${{ env.SHA_SHORT }} in prod"
+          commit-message: "ci(auth-service): update image tag to ${{ env.SHA_SHORT }} in prod"
+          body: |
+            Automated image-tag bump for **auth-service**.
+
+            - Image: `ghcr.io/minhajul/auth-service:${{ env.SHA_SHORT }}`
+            - Values file: `${{ env.VALUES_FILE }}`
+            - Triggered by: `${{ github.event.head_commit.message }}`
+
+            Merge to deploy to prod via ArgoCD.
