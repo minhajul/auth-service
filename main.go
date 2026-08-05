@@ -79,19 +79,19 @@ func main() {
 	select {
 	case err := <-serverErr:
 		if err != nil {
-			log.Fatalf("server failed: %v", err)
+			log.Fatalf("Server failed: %v", err)
 		}
 	case sig := <-quit:
-		log.Printf("received signal %s, shutting down gracefully...", sig)
+		log.Printf("Received signal %s, shutting down gracefully...", sig)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("graceful shutdown failed: %v", err)
+		log.Printf("Graceful shutdown failed: %v", err)
 		if err := srv.Close(); err != nil {
-			log.Printf("force close failed: %v", err)
+			log.Printf("Force close failed: %v", err)
 		}
 		os.Exit(1)
 	}
