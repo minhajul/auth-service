@@ -95,11 +95,10 @@ jobs:
       - name: Open PR against fleet
         # Branch is per-push; ArgoCD won't see the change until the PR is merged into main.
         # `commit-message` runs after the file edit so the PR body and commit stay in sync.
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.FLEET_PAT }}
           path: fleet
-          push-to-fork: false
           branch: ci/auth-prod-${{ env.SHA_SHORT }}
           base: main
           title: "ci(auth-service): update image tag to ${{ env.SHA_SHORT }} in prod"
